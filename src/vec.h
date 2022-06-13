@@ -4,9 +4,6 @@
 #include <bitset>
 
 template <size_t T>
-using Vec = std::bitset<T>;
-
-template <size_t T, size_t U>
-using Vec2 = Vec<T * U>;
+using Bitvec = std::bitset<T>;
 
 #endif
