@@ -4,10 +4,8 @@
 
 int main()
 {
-    Dense<2, 100> dense1 = Dense<2, 100>();
-    Dense<100, 100> dense2 = Dense<100, 100>();
-    Dense<100, 100> dense3 = Dense<100, 100>();
-    Dense<100, 2> dense4 = Dense<100, 2>();
+    Dense<2, 10> dense1 = Dense<2, 10>();
+    Dense<10, 2> dense4 = Dense<10, 2>();
 
     std::vector<Bitvec<2>> input = {
         Bitvec<2>(0b00),
@@ -25,14 +23,14 @@ int main()
     {
         for (size_t i = 0; i < input.size(); i++)
         {
-            dense4.forward(dense3.forward(dense2.forward(dense1.forward(input[i]))));
-            dense1.backward(dense2.backward(dense3.backward(dense4.backward(output[i]))));
+            dense4.forward(dense1.forward(input[i]));
+            dense1.backward(dense4.backward(output[i]));
         }
     }
 
     for (size_t i = 0; i < input.size(); i++)
     {
-        auto result = dense4.forward(dense3.forward(dense2.forward(dense1.forward(input[i]))));
+        auto result = dense4.forward(dense1.forward(input[i]));
 
         std::cout << "input: " << input[i] << std::endl;
         std::cout << "result: " << result << std::endl;
