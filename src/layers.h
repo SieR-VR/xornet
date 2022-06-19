@@ -1,11 +1,6 @@
 #ifndef LAYERS_H_
 #define LAYERS_H_
 
-#include <initializer_list>
-#include <vector>
-#include <random>
-#include <iostream>
-
 #include "vec.h"
 
 template <size_t I, size_t O>
@@ -14,71 +9,67 @@ class BaseNet
 public:
     BaseNet() {}
 
-    Bitvec<O> forward(const Bitvec<I> &input);
-    Bitvec<I> backward(const Bitvec<O> &delta);
+    Quantized<O> forward(const Quantized<I> &input);
+    Vector<int, I> backward(const Vector<int, O> &delta);
 };
 
 template <size_t I, size_t O>
 class Dense : public BaseNet<I, O>
 {
 public:
-    Dense() : weights(O), gen(rd()), dist(0.5)
+    Dense() : weights()
     {
-        for (size_t i = 0; i < O; i++)
-            for (size_t j = 0; j < I; j++)
-                weights[i][j] = dist(gen);
     }
 
-    Bitvec<O> forward(const Bitvec<I> &input)
+    Quantized<O> forward(const Quantized<I> &input)
     {
         input_temp = input;
-        Bitvec<O> output;
-
-        for (size_t i = 0; i < O; i++)
-        {
-            size_t product = (input ^ weights[i]).count();
-            output[i] = (product * 2 >= I);
-        }
-
-        output_temp = output;
-        return output;
+        output_temp = input.dot(weights);
+        return output_temp;
     }
 
-    Bitvec<I> backward(const Bitvec<O> &delta)
+    Tensor<int, I> backward(const Tensor<int, O> &next_delta, double lr)
     {
-        Bitvec<O> diff = delta ^ output_temp;
-        Bitvec<I> delta_input = input_temp;
+        Tensor<int, I> delta = dot_delta(next_delta, weights.transpose());
+        weights.update(dot_reverse(next_delta, input_temp), lr);
 
-        std::vector<Bitvec<I>> weights_diff = weights;
-
-        for (size_t i = 0; i < O; i++)
-            if (diff[i] && dist(gen))
-                weights[i] = (delta[i] ? Bitvec<I>().set() : Bitvec<I>().reset()) ^ input_temp;
-
-        for (size_t i = 0; i < O; i++)
-            weights_diff[i] ^= weights[i];
-
-        for (size_t i = 0; i < I; i++)
-        {
-            size_t product = 0;
-            for (size_t j = 0; j < O; j++)
-                product += weights_diff[j][i];
-            if (product * 2 >= O)
-                delta_input[i] = ~delta_input[i];
-        }
-
-        return delta_input;
+        return delta;
     }
 
 private:
-    std::vector<Bitvec<I>> weights;
+    Quantized<O, I> weights;
 
-    Bitvec<I> input_temp;
-    Bitvec<O> output_temp;
+    Quantized<I> input_temp;
+    Quantized<O> output_temp;
+};
 
-    std::random_device rd;
-    std::mt19937 gen;
-    std::bernoulli_distribution dist;
+template <size_t I, size_t O>
+class Softmax : public BaseNet<I, O>
+{
+public:
+    Softmax() : weights()
+    {
+    }
+
+    Tensor<size_t, O> forward(const Quantized<I> &input)
+    {
+        input_temp = input;
+        return input.dot_raw(weights);
+    }
+
+    Tensor<int, I> backward(const Tensor<int, O> &delta_next, double lr)
+    {
+        Tensor<int, I> delta = dot_delta(delta_next, transpose(weights));
+        weights.update(dot_reverse(delta_next, input_temp), lr);
+
+        return delta;
+    }
+
+private:
+    Quantized<O, I> weights;
+
+    Quantized<I> input_temp;
+    Quantized<O> output_temp;
 };
 
 #endif
